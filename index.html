@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -697,6 +697,13 @@
 
   // ===== دوال البطاقة =====
 
+  quoteSelect.addEventListener('change', function() {
+    customQuoteInput.style.display = (quoteSelect.value === 'custom') ? 'block' : 'none';
+    if (quoteSelect.value === 'custom') {
+      customQuoteInput.focus();
+    }
+  });
+
   function applyThemePreview() {
     const theme = document.querySelector('input[name="themeChoice"]:checked').value;
     document.documentElement.setAttribute('data-theme', theme);
@@ -910,24 +917,35 @@
 
   // ===== مشاركة الرابط =====
 
+  // مفاتيح مختصرة لرابط أقصر: n=الاسم s=العلامة o=العلامة الكاملة
+  // c=نوع الشهادة (b/t) t=الطابع q=العبارة (رقم إن كانت جاهزة، أو نص إن كانت مخصصة)
+  // f=من p=رابط الصورة ph=صورة base64 احتياطية
+  const certTypeShort = { 'بكالوريا': 'b', 'تاسع': 't' };
+  const certTypeLong = { b: 'بكالوريا', t: 'تاسع' };
+
   function buildShareUrl(state) {
     const params = new URLSearchParams();
-    params.set('name', state.name);
-    params.set('score', state.score);
-    params.set('outOf', state.outOf);
-    params.set('certType', state.certType);
-    params.set('theme', state.theme);
-    params.set('quote', state.quote);
-    if (state.fromText) params.set('from', state.fromText);
+    params.set('n', state.name);
+    params.set('s', state.score);
+    params.set('o', state.outOf);
+    params.set('c', certTypeShort[state.certType] || 'b');
+    params.set('t', state.theme);
 
-    // نُفضّل دوماً رابط ImgBB الدائم إن وُجد.
+    // العبارة: إن كانت إحدى العبارات الجاهزة نرسل رقمها فقط بدل النص الكامل
+    // (النص الكامل بالعربي يطوّل الرابط كتير بعد الترميز)، وإلا نرسل النص كما هو.
+    const quoteIndex = quotes.indexOf(state.quote);
+    params.set('q', quoteIndex !== -1 ? String(quoteIndex) : state.quote);
+
+    if (state.fromText) params.set('f', state.fromText);
+
+    // نُفضّل دوماً رابط ImgBB الدائم إن وُجد (قصير أصلاً).
     // فقط إن لم يتوفر (فشل الرفع أو ما زال جارياً) نلجأ لتضمين الصورة
     // كنص base64 داخل الرابط نفسه، بحد أقصى أكبر يطابق حجم الضغط الفعلي
     // (كانت القيمة القديمة 15000 تُسقط الصورة بصمت في أغلب الحالات).
     if (state.photo && state.photo.startsWith('http')) {
-      params.set('photoUrl', state.photo);
+      params.set('p', state.photo);
     } else if (state.photo && state.photo.length < 70000) {
-      params.set('photo', state.photo);
+      params.set('ph', state.photo);
     }
 
     const base = location.origin + location.pathname;
@@ -981,16 +999,31 @@
 
   function loadFromUrlIfPresent() {
     const params = new URLSearchParams(location.search);
-    if (!params.has('name')) return;
+    // ندعم المفاتيح المختصرة الجديدة (n, s, o...) وأيضاً الأسماء القديمة
+    // الطويلة (name, score, outOf...) كي تبقى الروابط المُرسلة سابقاً تعمل.
+    if (!params.has('n') && !params.has('name')) return;
 
-    const name = params.get('name') || '';
-    const score = Number(params.get('score')) || 0;
-    const outOf = Number(params.get('outOf')) || 2800;
-    const certType = params.get('certType') || 'بكالوريا';
-    const theme = params.get('theme') || 'girl';
-    const quote = params.get('quote') || quotes[0];
-    const fromText = params.get('from') || '';
-    const photoUrl = params.get('photoUrl') || params.get('photo') || null;
+    const name = params.get('n') ?? params.get('name') ?? '';
+    const score = Number(params.get('s') ?? params.get('score')) || 0;
+    const outOf = Number(params.get('o') ?? params.get('outOf')) || 2800;
+
+    const rawCertType = params.get('c') ?? params.get('certType') ?? 'b';
+    const certType = certTypeLong[rawCertType] || rawCertType || 'بكالوريا';
+
+    const theme = params.get('t') ?? params.get('theme') ?? 'girl';
+
+    const rawQuote = params.get('q') ?? params.get('quote');
+    let quote;
+    if (rawQuote === null || rawQuote === '') {
+      quote = quotes[0];
+    } else if (/^[0-4]$/.test(rawQuote)) {
+      quote = quotes[Number(rawQuote)];
+    } else {
+      quote = rawQuote;
+    }
+
+    const fromText = params.get('f') ?? params.get('from') ?? '';
+    const photoUrl = params.get('p') ?? params.get('photoUrl') ?? params.get('ph') ?? params.get('photo') ?? null;
 
     document.documentElement.setAttribute('data-theme', theme);
     buildCard(name, score, outOf, certType, theme, quote, fromText, photoUrl);
@@ -1140,4 +1173,3 @@
 
 </body>
 </html>
-
