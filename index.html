@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Changa:wght@600;700;800&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
+  /* نفس الـ CSS السابق مع إضافة تحسينات */
   :root{
     --pink-deep:#e6417a;
     --pink-bright:#ff6fa5;
@@ -51,11 +52,6 @@
   }
   .display{font-family:var(--display-font);}
 
-  /* floating decorative blobs */
-  .blob{
-    position:fixed; border-radius:50%; filter:blur(2px); opacity:.35; z-index:0; pointer-events:none;
-  }
-
   canvas#confetti-canvas{
     position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50;
   }
@@ -67,7 +63,6 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center;
   }
 
-  /* ---------- FORM VIEW ---------- */
   #formView{
     width:100%;
     background:var(--white);
@@ -178,6 +173,21 @@
     text-align:center;
   }
   .photo-btn:hover{border-color:var(--pink-bright);}
+  
+  /* حالة رفع الصورة */
+  .upload-status{
+    font-size:12px; color:var(--plum-light); text-align:center; margin-top:4px;
+    display:none; font-weight:500;
+  }
+  .upload-status.show{display:block;}
+  .upload-status .spinner-small{
+    display:inline-block;
+    width:14px; height:14px; border:2px solid var(--pink-soft);
+    border-top-color:var(--pink-bright);
+    border-radius:50%;
+    animation:spin .6s linear infinite;
+    vertical-align:middle; margin-left:6px;
+  }
 
   .submit-btn{
     width:100%; margin-top:8px;
@@ -188,6 +198,10 @@
     transition:transform .15s;
   }
   .submit-btn:active{transform:scale(.97);}
+  .submit-btn:disabled{
+    opacity:0.7;
+    cursor:not-allowed;
+  }
 
   .share-btn{
     width:100%; margin-top:14px;
@@ -199,6 +213,10 @@
   }
   .share-btn:hover{background:var(--pink-soft);}
   .share-btn.copied{background:var(--pink-soft);}
+  .share-btn:disabled{
+    opacity:0.6;
+    cursor:not-allowed;
+  }
   .share-note{
     font-size:11.5px; color:var(--plum-light); text-align:center; margin-top:8px; opacity:.8; line-height:1.6;
   }
@@ -211,7 +229,6 @@
     color:var(--pink-deep); font-size:13px; font-weight:700; margin-top:-8px; margin-bottom:12px; display:none;
   }
 
-  /* ---------- CARD VIEW ---------- */
   #cardView{display:none; width:100%; flex-direction:column; align-items:center;}
 
   .card{
@@ -270,17 +287,23 @@
     border:3px solid #ffffff;
     position:relative;
   }
-  .photo-frame-inner img{width:100%; height:100%; object-fit:cover; object-position:center top; display:block;}
+  .photo-frame-inner img{
+    width:100%; height:100%; object-fit:cover; object-position:center top; display:block;
+    image-rendering:auto;
+    transition:opacity .3s ease;
+  }
+  .photo-frame-inner img.loading{opacity:0;}
+  .photo-frame-inner img.loaded{opacity:1;}
   .photo-spinner{
     width:34px; height:34px; border-radius:50%;
     border:4px solid var(--pink-soft); border-top-color:var(--pink-bright);
     animation:spin .8s linear infinite;
+    position:absolute;
+    z-index:10;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
   @media (prefers-reduced-motion: reduce){
     .photo-spinner{animation:none;}
-  }
-  @media (prefers-reduced-motion: reduce){
     .photo-frame{animation:none;}
   }
 
@@ -298,11 +321,6 @@
   .student-name{
     font-size:26px; font-weight:900; color:var(--plum);
     margin-bottom:4px;
-  }
-  .student-type{
-    display:inline-block; font-size:13px; font-weight:700;
-    color:var(--pink-deep); background:var(--pink-soft);
-    padding:4px 14px; border-radius:999px; margin-bottom:22px;
   }
 
   .score-box{
@@ -347,7 +365,6 @@
     font-size:13px; color:var(--plum-light); font-weight:700; opacity:.85;
   }
   .signature-row .sig-icon{font-size:14px;}
-  .signature-row .dot{width:5px; height:5px; border-radius:50%; background:var(--pink-bright);}
 
   @media (prefers-reduced-motion: reduce){
     .score-bar-fill{transition:none;}
@@ -365,7 +382,6 @@
 
 <div class="wrap">
 
-  <!-- FORM -->
   <div id="formView">
     <div class="form-eyebrow" id="formEyebrow">بطاقات التهنئة 🎀</div>
     <h1 class="form-title display" id="formTitle">مبروك <span>النجاح</span> 🌸</h1>
@@ -426,6 +442,10 @@
         <label class="photo-btn" for="photoInput">اختيار صورة لإظهارها في البطاقة</label>
         <input type="file" id="photoInput" accept="image/*" style="display:none;">
       </div>
+      <div class="upload-status" id="uploadStatus">
+        <span class="spinner-small"></span>
+        جاري رفع الصورة ...
+      </div>
     </div>
 
     <div class="field">
@@ -449,7 +469,6 @@
     <button class="submit-btn" id="generateBtn">أنشئي البطاقة ✨</button>
   </div>
 
-  <!-- CARD -->
   <div id="cardView">
     <div class="card" id="card">
       <span class="corner tl" id="cornerTl">✨</span>
@@ -460,7 +479,9 @@
       <div class="ribbon" id="cardTypeRibbon">شهادة البكالوريا</div>
 
       <div class="photo-frame" id="photoFrameWrap" style="display:none;">
-        <div class="photo-frame-inner" id="photoFrameInner"></div>
+        <div class="photo-frame-inner" id="photoFrameInner">
+          <div class="photo-spinner" id="photoSpinner"></div>
+        </div>
       </div>
 
       <div class="congrats-word display">مبروك النجاح!</div>
@@ -487,7 +508,7 @@
     </div>
 
     <button class="share-btn" id="shareBtn">🔗 نسخ رابط البطاقة للمشاركة</button>
-    <div class="share-note">يفتح الرابط البطاقة بنفس البيانات مباشرة عند أي شخص يفتحه</div>
+    <div class="share-note" id="shareNote">يفتح الرابط البطاقة بنفس البيانات مباشرة عند أي شخص يفتحه</div>
     <span class="make-own-link" id="makeOwnLink" style="display:none;">أنشئي بطاقتك الخاصة ✨</span>
   </div>
 
@@ -495,6 +516,12 @@
 
 <script>
 (function(){
+  // ===== الإعدادات =====
+  // سجل للحصول على مفتاح API مجاني من: https://api.imgbb.com/
+  // المفتاح التالي هو مفتاح تجريبي، يفضل استبداله بمفتاحك الخاص
+  const IMGBB_API_KEY = 'c7fc5168b051dbada13d2db455416bf8'; // ضع مفتاحك هنا
+  
+  // ===== المتغيرات =====
   const nameInput = document.getElementById('nameInput');
   const scoreInput = document.getElementById('scoreInput');
   const outOfInput = document.getElementById('outOfInput');
@@ -507,54 +534,15 @@
   const fromInput = document.getElementById('fromInput');
   const quoteSelect = document.getElementById('quoteSelect');
   const customQuoteInput = document.getElementById('customQuoteInput');
+  const uploadStatus = document.getElementById('uploadStatus');
+  const shareBtn = document.getElementById('shareBtn');
+  const shareNote = document.getElementById('shareNote');
+  const makeOwnLink = document.getElementById('makeOwnLink');
 
-  let photoDataUrl = null;
+  let uploadedPhotoUrl = null; // رابط الصورة من ImgBB
+  let photoDataUrl = null; // البيانات المؤقتة للصورة
   let lastCardState = null;
-
-  photoInput.addEventListener('change', function(e){
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(ev){
-      compressImage(ev.target.result, function(compressedDataUrl){
-        photoDataUrl = compressedDataUrl;
-        photoPreview.innerHTML = '<img src="'+photoDataUrl+'" alt="صورة">';
-      });
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // Resizes/compresses an image so it stays small enough to embed reliably in a share link,
-  // while still looking sharp inside the circular photo frame.
-  function compressImage(srcDataUrl, callback){
-    const img = new Image();
-    img.onload = function(){
-      const maxDim = 480;
-      let w = img.width, h = img.height;
-      if(w > h && w > maxDim){ h = Math.round(h * (maxDim/w)); w = maxDim; }
-      else if(h >= w && h > maxDim){ w = Math.round(w * (maxDim/h)); h = maxDim; }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const cctx = canvas.getContext('2d');
-      cctx.drawImage(img, 0, 0, w, h);
-
-      // Try progressively lower quality until the result is small enough for a URL
-      let quality = 0.82;
-      let out = canvas.toDataURL('image/jpeg', quality);
-      while(out.length > 90000 && quality > 0.35){
-        quality -= 0.12;
-        out = canvas.toDataURL('image/jpeg', quality);
-      }
-      callback(out);
-    };
-    img.onerror = function(){ callback(srcDataUrl); };
-    img.src = srcDataUrl;
-  }
-
-  quoteSelect.addEventListener('change', function(){
-    customQuoteInput.style.display = (quoteSelect.value === 'custom') ? 'block' : 'none';
-  });
+  let isUploading = false;
 
   const quotes = [
     "النجاح ثمرة التعب والإصرار، ومسيرتك القادمة أجمل بكثير 🌷",
@@ -565,27 +553,173 @@
   ];
 
   const themeEmojis = {
-    girl: {tl:'✨', tr:'🌸', bl:'🎀', br:'✨', sig:'🎀', form1:'🌸', form2:'🎀', title:'🌸'},
-    boy:  {tl:'⭐', tr:'🚀', bl:'🏆', br:'⭐', sig:'🏆', form1:'🏆', form2:'⭐', title:'🏆'}
+    girl: {tl:'✨', tr:'🌸', bl:'🎀', br:'✨', sig:'🎀'},
+    boy:  {tl:'⭐', tr:'🚀', bl:'🏆', br:'⭐', sig:'🏆'}
   };
 
-  function applyThemePreview(){
+  // ===== دوال رفع الصورة =====
+  
+  // ضغط الصورة بسرعة عالية وجودة منخفضة للرفع السريع
+  function compressImageFast(srcDataUrl, callback) {
+    const img = new Image();
+    img.onload = function() {
+      // تصغير الأبعاد بشكل كبير للسرعة
+      let maxDim = 240;
+      let w = img.width, h = img.height;
+      if (w > h && w > maxDim) { h = Math.round(h * (maxDim/w)); w = maxDim; }
+      else if (h >= w && h > maxDim) { w = Math.round(w * (maxDim/h)); h = maxDim; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // جودة منخفضة جداً للسرعة
+      let quality = 0.55;
+      let out = canvas.toDataURL('image/jpeg', quality);
+      
+      // محاولة تقليل الحجم أكثر
+      let attempts = 0;
+      while (out.length > 50000 && quality > 0.2 && attempts < 5) {
+        quality -= 0.07;
+        out = canvas.toDataURL('image/jpeg', quality);
+        attempts++;
+      }
+      
+      callback(out);
+    };
+    img.onerror = function() { callback(null); };
+    img.src = srcDataUrl;
+  }
+
+  // رفع الصورة إلى ImgBB
+  function uploadToImgBB(imageDataUrl) {
+    return new Promise((resolve, reject) => {
+      if (!imageDataUrl) {
+        reject('لا توجد صورة');
+        return;
+      }
+
+      // إزالة "data:image/jpeg;base64," من البداية
+      const base64Image = imageDataUrl.split(',')[1];
+      if (!base64Image) {
+        reject('تنسيق صورة غير صحيح');
+        return;
+      }
+
+      // إنشاء FormData
+      const formData = new FormData();
+      formData.append('key', IMGBB_API_KEY);
+      formData.append('image', base64Image);
+      formData.append('expiration', '600'); // تنتهي بعد 10 دقائق (اختياري)
+
+      // إظهار حالة الرفع
+      uploadStatus.classList.add('show');
+      uploadStatus.innerHTML = '<span class="spinner-small"></span> جاري رفع الصورة ...';
+
+      // إرسال الطلب
+      fetch('https://api.imgbb.com/1/upload', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('فشل رفع الصورة: ' + response.status);
+        }
+        return response.json();
+      })
+      .then(data => {
+        uploadStatus.classList.remove('show');
+        if (data.success) {
+          resolve(data.data.url);
+        } else {
+          reject(data.error?.message || 'فشل رفع الصورة');
+        }
+      })
+      .catch(error => {
+        uploadStatus.classList.remove('show');
+        reject(error.message);
+      });
+    });
+  }
+
+  // ===== دوال معالجة الصورة =====
+
+  photoInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // معاينة الصورة فوراً
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const previewData = ev.target.result;
+      photoPreview.innerHTML = '<img src="' + previewData + '" alt="صورة">';
+      
+      // ضغط الصورة للرفع السريع
+      compressImageFast(previewData, function(compressed) {
+        if (compressed) {
+          photoDataUrl = compressed;
+          
+          // رفع الصورة تلقائياً (للتحضير المسبق)
+          if (IMGBB_API_KEY && IMGBB_API_KEY !== 'YOUR_IMGBB_API_KEY') {
+            autoUploadPhoto(compressed);
+          } else {
+            uploadStatus.innerHTML = '⚠️ يرجى إدخال مفتاح API لرفع الصورة';
+            uploadStatus.classList.add('show');
+          }
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // رفع تلقائي للصورة (خلفية)
+  function autoUploadPhoto(compressedData) {
+    if (isUploading) return;
+    isUploading = true;
+
+    uploadToImgBB(compressedData)
+      .then(url => {
+        uploadedPhotoUrl = url;
+        isUploading = false;
+        uploadStatus.classList.remove('show');
+        // تحديث المعاينة لإظهار نجاح الرفع
+        photoPreview.innerHTML = '<img src="' + compressedData + '" alt="صورة"> ✅';
+        setTimeout(() => {
+          photoPreview.innerHTML = '<img src="' + compressedData + '" alt="صورة">';
+        }, 2000);
+      })
+      .catch(error => {
+        isUploading = false;
+        uploadStatus.innerHTML = '⚠️ فشل رفع الصورة: ' + error;
+        uploadStatus.classList.add('show');
+        // محاولة استخدام الصورة مضغوطة مباشرة (كحل احتياطي)
+        if (compressedData && compressedData.length < 30000) {
+          photoDataUrl = compressedData;
+        }
+      });
+  }
+
+  // ===== دوال البطاقة =====
+
+  function applyThemePreview() {
     const theme = document.querySelector('input[name="themeChoice"]:checked').value;
     document.documentElement.setAttribute('data-theme', theme);
   }
-  document.querySelectorAll('input[name="themeChoice"]').forEach(r=>{
+  document.querySelectorAll('input[name="themeChoice"]').forEach(r => {
     r.addEventListener('change', applyThemePreview);
   });
 
-  function showError(msg){
+  function showError(msg) {
     scoreError.textContent = msg;
     scoreError.style.display = 'block';
   }
-  function hideError(){
+  function hideError() {
     scoreError.style.display = 'none';
   }
 
-  generateBtn.addEventListener('click', function(){
+  generateBtn.addEventListener('click', function() {
     const name = nameInput.value.trim();
     const scoreRaw = scoreInput.value.trim();
     const outOfRaw = outOfInput.value.trim();
@@ -594,17 +728,17 @@
     const certType = document.querySelector('input[name="certType"]:checked').value;
     const theme = document.querySelector('input[name="themeChoice"]:checked').value;
 
-    if(!name){
+    if (!name) {
       nameInput.focus();
       nameInput.style.borderColor = '#e6417a';
       return;
     }
-    if(outOfRaw === '' || isNaN(outOf) || outOf <= 0){
+    if (outOfRaw === '' || isNaN(outOf) || outOf <= 0) {
       showError('فضلاً أدخلي العلامة الكاملة (مثلاً 2800 أو 360)');
       outOfInput.focus();
       return;
     }
-    if(scoreRaw === '' || isNaN(score) || score < 0 || score > outOf){
+    if (scoreRaw === '' || isNaN(score) || score < 0 || score > outOf) {
       showError('فضلاً أدخلي علامة صحيحة لا تتجاوز ' + outOf);
       scoreInput.focus();
       return;
@@ -614,28 +748,64 @@
     document.documentElement.setAttribute('data-theme', theme);
 
     let quote;
-    if(quoteSelect.value === 'custom'){
-      quote = customQuoteInput.value.trim() || quotes[Math.floor(Math.random()*quotes.length)];
+    if (quoteSelect.value === 'custom') {
+      quote = customQuoteInput.value.trim() || quotes[Math.floor(Math.random() * quotes.length)];
     } else {
       quote = quotes[Number(quoteSelect.value)];
     }
 
-    buildCard(name, score, outOf, certType, theme, quote, fromInput.value.trim());
+    // استخدام الصورة المرفوعة إذا وجدت، وإلا استخدام الصورة المضغوطة
+    const finalPhoto = uploadedPhotoUrl || photoDataUrl || null;
+    
+    buildCard(name, score, outOf, certType, theme, quote, fromInput.value.trim(), finalPhoto);
     formView.style.display = 'none';
     cardView.style.display = 'flex';
     launchConfetti();
   });
 
-  function buildCard(name, score, outOf, certType, theme, quote, fromText, photoUrl){
+  function displayPhoto(photoInner, photoWrap, photoUrl, name) {
+    if (!photoUrl) {
+      photoWrap.style.display = 'none';
+      return;
+    }
+
+    photoWrap.style.display = 'flex';
+    const spinner = document.getElementById('photoSpinner');
+    spinner.style.display = 'block';
+
+    const oldImg = photoInner.querySelector('img');
+    if (oldImg) oldImg.remove();
+
+    const img = new Image();
+    img.alt = name || 'صورة';
+    img.className = 'loading';
+    img.loading = 'lazy';
+
+    img.onload = function() {
+      spinner.style.display = 'none';
+      img.className = 'loaded';
+      photoInner.appendChild(img);
+      window.scrollTo(0, 0);
+    };
+
+    img.onerror = function() {
+      spinner.style.display = 'none';
+      photoWrap.style.display = 'none';
+    };
+
+    img.src = photoUrl;
+  }
+
+  function buildCard(name, score, outOf, certType, theme, quote, fromText, photoUrl) {
     document.getElementById('cardName').textContent = name;
     document.getElementById('cardScore').innerHTML = score + '<small>/' + outOf + '</small>';
 
-    const pct = Math.round((score/outOf)*100);
+    const pct = Math.round((score / outOf) * 100);
     document.getElementById('cardPercent').innerHTML = 'نسبة النجاح <bdi dir="ltr">' + pct + '%</bdi>';
 
     const ribbon = document.getElementById('cardTypeRibbon');
     const typeLine = document.getElementById('cardTypeLine');
-    if(certType === 'بكالوريا'){
+    if (certType === 'بكالوريا') {
       ribbon.textContent = 'شهادة البكالوريا 🎓';
       typeLine.textContent = 'نجاح باهر في شهادة البكالوريا';
     } else {
@@ -652,7 +822,7 @@
     document.getElementById('cornerBr').textContent = em.br;
 
     const signatureRow = document.getElementById('signatureRow');
-    if(fromText){
+    if (fromText) {
       document.getElementById('signatureText').textContent = fromText;
       document.getElementById('sigIconLeft').textContent = em.sig;
       document.getElementById('sigIconRight').textContent = em.sig;
@@ -663,38 +833,22 @@
 
     const photoWrap = document.getElementById('photoFrameWrap');
     const photoInner = document.getElementById('photoFrameInner');
-    const finalPhoto = photoUrl || photoDataUrl;
-    if(finalPhoto){
-      photoInner.innerHTML = '<div class="photo-spinner"></div>';
-      photoWrap.style.display = 'flex';
-      const img = new Image();
-      img.alt = name;
-      img.onload = function(){
-        photoInner.innerHTML = '';
-        photoInner.appendChild(img);
-        window.scrollTo(0,0);
-      };
-      img.onerror = function(){
-        photoWrap.style.display = 'none';
-      };
-      img.src = finalPhoto;
+    if (photoUrl) {
+      displayPhoto(photoInner, photoWrap, photoUrl, name);
     } else {
       photoWrap.style.display = 'none';
     }
 
-    lastCardState = {name, score, outOf, certType, theme, quote, fromText, photo: finalPhoto};
+    lastCardState = { name, score, outOf, certType, theme, quote, fromText, photo: photoUrl };
 
-    setTimeout(function(){
+    setTimeout(function() {
       document.getElementById('cardBar').style.width = pct + '%';
     }, 150);
   }
 
-  /* ---------- SHARE LINK ---------- */
-  const shareBtn = document.getElementById('shareBtn');
-  const makeOwnLink = document.getElementById('makeOwnLink');
-  const shareNote = document.querySelector('.share-note');
+  // ===== مشاركة الرابط =====
 
-  function buildShareUrl(state){
+  function buildShareUrl(state) {
     const params = new URLSearchParams();
     params.set('name', state.name);
     params.set('score', state.score);
@@ -702,46 +856,70 @@
     params.set('certType', state.certType);
     params.set('theme', state.theme);
     params.set('quote', state.quote);
-    if(state.fromText) params.set('from', state.fromText);
-    // Photos are compressed before this point, so this generous ceiling should
-    // basically always include them; it's just a safety cap for extreme edge cases.
-    if(state.photo && state.photo.length < 300000){
+    if (state.fromText) params.set('from', state.fromText);
+    
+    // إذا كانت الصورة من ImgBB (رابط قصير)
+    if (state.photo && state.photo.startsWith('http')) {
+      params.set('photoUrl', state.photo);
+    } 
+    // وإلا إذا كانت الصورة مضغوطة وصغيرة
+    else if (state.photo && state.photo.length < 20000) {
       params.set('photo', state.photo);
     }
+
     const base = location.origin + location.pathname;
     return base + '?' + params.toString();
   }
 
-  shareBtn.addEventListener('click', function(){
-    if(!lastCardState) return;
-    const url = buildShareUrl(lastCardState);
-    const photoSkipped = lastCardState.photo && lastCardState.photo.length >= 300000;
-
-    function done(){
-      shareBtn.textContent = '✅ تم نسخ الرابط';
-      shareBtn.classList.add('copied');
-      setTimeout(()=>{ shareBtn.textContent = '🔗 نسخ رابط البطاقة للمشاركة'; shareBtn.classList.remove('copied'); }, 2200);
-      shareNote.textContent = photoSkipped
-        ? 'تم النسخ. ملاحظة: الصورة كبيرة الحجم فلم تُضَف إلى الرابط.'
-        : 'يفتح الرابط البطاقة بنفس البيانات مباشرة عند أي شخص يفتحه';
+  shareBtn.addEventListener('click', function() {
+    if (!lastCardState) {
+      // محاولة استعادة البيانات من البطاقة
+      const name = document.getElementById('cardName').textContent;
+      const scoreText = document.getElementById('cardScore').textContent;
+      const match = scoreText.match(/(\d+)\/(\d+)/);
+      if (match) {
+        const score = parseInt(match[1]);
+        const outOf = parseInt(match[2]);
+        const certType = document.getElementById('cardTypeRibbon').textContent.includes('بكالوريا') ? 'بكالوريا' : 'تاسع';
+        const theme = document.documentElement.getAttribute('data-theme') || 'girl';
+        const quote = document.getElementById('cardQuote').textContent;
+        lastCardState = { name, score, outOf, certType, theme, quote, fromText: '', photo: null };
+      } else {
+        shareNote.textContent = '⚠️ لا توجد بيانات للمشاركة';
+        return;
+      }
     }
 
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(url).then(done).catch(()=>{
-        window.prompt('انسخي الرابط يدوياً:', url);
-      });
+    const url = buildShareUrl(lastCardState);
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => {
+          shareBtn.textContent = '✅ تم نسخ الرابط';
+          shareBtn.classList.add('copied');
+          setTimeout(() => {
+            shareBtn.textContent = '🔗 نسخ رابط البطاقة للمشاركة';
+            shareBtn.classList.remove('copied');
+          }, 2200);
+          shareNote.textContent = 'الرابط قصير وسريع! الصورة محملة على خادم خارجي 🚀';
+        })
+        .catch(() => {
+          window.prompt('انسخي الرابط يدوياً:', url);
+        });
     } else {
       window.prompt('انسخي الرابط يدوياً:', url);
     }
   });
 
-  makeOwnLink.addEventListener('click', function(){
+  makeOwnLink.addEventListener('click', function() {
     location.href = location.origin + location.pathname;
   });
 
-  function loadFromUrlIfPresent(){
+  // ===== تحميل من الرابط =====
+
+  function loadFromUrlIfPresent() {
     const params = new URLSearchParams(location.search);
-    if(!params.has('name')) return;
+    if (!params.has('name')) return;
 
     const name = params.get('name') || '';
     const score = Number(params.get('score')) || 0;
@@ -750,137 +928,143 @@
     const theme = params.get('theme') || 'girl';
     const quote = params.get('quote') || quotes[0];
     const fromText = params.get('from') || '';
-    const photo = params.get('photo') || null;
+    const photoUrl = params.get('photoUrl') || params.get('photo') || null;
 
     document.documentElement.setAttribute('data-theme', theme);
-    buildCard(name, score, outOf, certType, theme, quote, fromText, photo);
+    buildCard(name, score, outOf, certType, theme, quote, fromText, photoUrl);
     formView.style.display = 'none';
     cardView.style.display = 'flex';
     makeOwnLink.style.display = 'block';
     launchConfetti();
 
-    // Keep the view pinned on the card/photo instead of drifting down while
-    // fonts and the image finish loading on a slow connection.
-    window.scrollTo(0,0);
-    window.addEventListener('load', function(){ window.scrollTo(0,0); });
-    setTimeout(function(){ window.scrollTo(0,0); }, 400);
-    setTimeout(function(){ window.scrollTo(0,0); }, 1200);
+    window.scrollTo(0, 0);
+    window.addEventListener('load', function() { window.scrollTo(0, 0); });
+    setTimeout(function() { window.scrollTo(0, 0); }, 400);
+    setTimeout(function() { window.scrollTo(0, 0); }, 1200);
   }
 
+  // ===== Confetti =====
 
   const canvas = document.getElementById('confetti-canvas');
   const ctx = canvas.getContext('2d');
   let particles = [];
   let animId = null;
 
-  function resizeCanvas(){
+  function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   }
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  const confettiColors = ['#ff6fa5','#e6417a','#f2c14e','#c9a6f0','#ffd6e6','#ffffff','#ffb6d9'];
-  const shapes = ['rect','circle','star','ribbon'];
+  const confettiColors = ['#ff6fa5', '#e6417a', '#f2c14e', '#c9a6f0', '#ffd6e6', '#ffffff', '#ffb6d9'];
+  const shapes = ['rect', 'circle', 'star', 'ribbon'];
 
-  function drawStar(ctx, r){
+  function drawStar(ctx, r) {
     ctx.beginPath();
-    for(let i=0;i<5;i++){
-      const angle = (i*4*Math.PI)/5 - Math.PI/2;
-      const x = Math.cos(angle)*r, y = Math.sin(angle)*r;
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+      const x = Math.cos(angle) * r, y = Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.closePath();
     ctx.fill();
   }
 
-  function makeParticle(originX, burst){
-    const shapeType = shapes[Math.floor(Math.random()*shapes.length)];
+  function makeParticle(originX, burst) {
+    const shapeType = shapes[Math.floor(Math.random() * shapes.length)];
     const fromBurst = burst && Math.random() < 0.6;
     return {
-      x: fromBurst ? originX + (Math.random()-0.5)*80 : Math.random()*canvas.width,
-      y: fromBurst ? canvas.height*0.35 + (Math.random()-0.5)*40 : -20 - Math.random()*canvas.height*0.6,
-      w: 6 + Math.random()*9,
-      h: 6 + Math.random()*11,
-      color: confettiColors[Math.floor(Math.random()*confettiColors.length)],
-      speedY: fromBurst ? -(3 + Math.random()*5) : 1.8 + Math.random()*3.2,
-      speedX: fromBurst ? (Math.random()-0.5)*9 : (Math.random()-0.5)*2.4,
+      x: fromBurst ? originX + (Math.random() - 0.5) * 80 : Math.random() * canvas.width,
+      y: fromBurst ? canvas.height * 0.35 + (Math.random() - 0.5) * 40 : -20 - Math.random() * canvas.height * 0.6,
+      w: 6 + Math.random() * 9,
+      h: 6 + Math.random() * 11,
+      color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+      speedY: fromBurst ? -(3 + Math.random() * 5) : 1.8 + Math.random() * 3.2,
+      speedX: fromBurst ? (Math.random() - 0.5) * 9 : (Math.random() - 0.5) * 2.4,
       gravity: fromBurst ? 0.18 : 0.045,
-      rot: Math.random()*360,
-      rotSpeed: (Math.random()-0.5)*9,
+      rot: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 9,
       shape: shapeType,
       opacity: 1,
-      sway: Math.random()*Math.PI*2
+      sway: Math.random() * Math.PI * 2
     };
   }
 
-  function launchConfetti(){
+  function launchConfetti() {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if(reduce) return;
+    if (reduce) return;
 
     particles = [];
-    const count = 220;
-    for(let i=0;i<count;i++){
-      particles.push(makeParticle(canvas.width/2, true));
+    const count = 180;
+    for (let i = 0; i < count; i++) {
+      particles.push(makeParticle(canvas.width / 2, true));
     }
 
     let frame = 0;
-    const maxFrames = 340;
+    const maxFrames = 300;
     let nextTrickle = 40;
 
-    if(animId) cancelAnimationFrame(animId);
+    if (animId) cancelAnimationFrame(animId);
 
-    function tick(){
+    function tick() {
       frame++;
 
-      if(frame === nextTrickle && frame < maxFrames - 100){
-        for(let i=0;i<18;i++) particles.push(makeParticle(0,false));
-        nextTrickle += 55;
+      if (frame === nextTrickle && frame < maxFrames - 100) {
+        for (let i = 0; i < 15; i++) particles.push(makeParticle(0, false));
+        nextTrickle += 50;
       }
 
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      particles.forEach(p=>{
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
         p.speedY += p.gravity * 0.06;
         p.y += p.speedY;
         p.sway += 0.05;
-        p.x += p.speedX + Math.sin(p.sway)*0.8;
+        p.x += p.speedX + Math.sin(p.sway) * 0.8;
         p.rot += p.rotSpeed;
-        if(frame > maxFrames - 70){
-          p.opacity -= 1/70;
+        if (frame > maxFrames - 60) {
+          p.opacity -= 1 / 60;
         }
         ctx.save();
-        ctx.globalAlpha = Math.max(p.opacity,0);
+        ctx.globalAlpha = Math.max(p.opacity, 0);
         ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot*Math.PI/180);
+        ctx.rotate(p.rot * Math.PI / 180);
         ctx.fillStyle = p.color;
-        if(p.shape === 'rect'){
-          ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
-        } else if(p.shape === 'circle'){
+        if (p.shape === 'rect') {
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        } else if (p.shape === 'circle') {
           ctx.beginPath();
-          ctx.arc(0,0,p.w/2,0,Math.PI*2);
+          ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
           ctx.fill();
-        } else if(p.shape === 'star'){
-          drawStar(ctx, p.w*0.7);
+        } else if (p.shape === 'star') {
+          drawStar(ctx, p.w * 0.7);
         } else {
-          ctx.fillRect(-p.w*0.9, -p.h*0.28, p.w*1.8, p.h*0.55);
+          ctx.fillRect(-p.w * 0.9, -p.h * 0.28, p.w * 1.8, p.h * 0.55);
         }
         ctx.restore();
       });
 
-      if(frame < maxFrames){
+      if (frame < maxFrames) {
         animId = requestAnimationFrame(tick);
       } else {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         particles = [];
       }
     }
     tick();
   }
 
+  // ===== بدء التشغيل =====
   loadFromUrlIfPresent();
+
+  // إظهار تنبيه إذا لم يتم إدخال مفتاح API
+  if (!IMGBB_API_KEY || IMGBB_API_KEY === 'YOUR_IMGBB_API_KEY') {
+    uploadStatus.innerHTML = '⚠️ يرجى إدخال مفتاح ImgBB API لرفع الصور';
+    uploadStatus.classList.add('show');
+  }
+
 })();
 </script>
 
 </body>
-</html>
-
+        </html>
