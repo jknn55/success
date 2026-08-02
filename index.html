@@ -172,7 +172,7 @@
     text-align:center;
   }
   .photo-btn:hover{border-color:var(--pink-bright);}
-
+  
   .upload-status{
     font-size:12px; color:var(--plum-light); text-align:center; margin-top:4px;
     display:none; font-weight:500;
@@ -525,14 +525,9 @@
 
 <script>
 (function(){
-  // منع المتصفح من استعادة موضع التمرير القديم عند فتح رابط مشاركة
-  if ('scrollRestoration' in history) {
-    history.scrollRestoration = 'manual';
-  }
-
   // ===== الإعدادات =====
   const IMGBB_API_KEY = 'c7fc5168b051dbada13d2db455416bf8';
-
+  
   // ===== المتغيرات =====
   const nameInput = document.getElementById('nameInput');
   const scoreInput = document.getElementById('scoreInput');
@@ -570,7 +565,7 @@
   };
 
   // ===== دوال رفع الصورة =====
-
+  
   function compressImageFast(srcDataUrl, callback) {
     const img = new Image();
     img.onload = function() {
@@ -587,14 +582,14 @@
 
       let quality = 0.6;
       let out = canvas.toDataURL('image/jpeg', quality);
-
+      
       let attempts = 0;
       while (out.length > 60000 && quality > 0.2 && attempts < 6) {
         quality -= 0.07;
         out = canvas.toDataURL('image/jpeg', quality);
         attempts++;
       }
-
+      
       callback(out);
     };
     img.onerror = function() { callback(null); };
@@ -617,9 +612,7 @@
       const formData = new FormData();
       formData.append('key', IMGBB_API_KEY);
       formData.append('image', base64Image);
-      // ملاحظة: لا نرسل "expiration" هنا كي تبقى الصورة محفوظة بشكل دائم على ImgBB.
-      // كانت الصورة سابقاً تُحذف بعد 10 دقائق (expiration=600) وهذا هو سبب
-      // عدم ظهورها عند فتح رابط المشاركة لاحقاً.
+      formData.append('expiration', '600');
 
       showUploadStatus('جاري رفع الصورة ...', 'loading');
 
@@ -663,19 +656,15 @@
     const file = e.target.files[0];
     if (!file) return;
 
-    // نصفّر أي رفع سابق حتى لا نستخدم رابط صورة قديمة بالخطأ
-    uploadedPhotoUrl = null;
-    photoDataUrl = null;
-
     const reader = new FileReader();
     reader.onload = function(ev) {
       const previewData = ev.target.result;
       photoPreview.innerHTML = '<img src="' + previewData + '" alt="صورة">';
-
+      
       compressImageFast(previewData, function(compressed) {
         if (compressed) {
           photoDataUrl = compressed;
-
+          
           if (IMGBB_API_KEY && IMGBB_API_KEY !== 'YOUR_IMGBB_API_KEY') {
             uploadToImgBB(compressed)
               .then(url => {
@@ -697,13 +686,6 @@
 
   // ===== دوال البطاقة =====
 
-  quoteSelect.addEventListener('change', function() {
-    customQuoteInput.style.display = (quoteSelect.value === 'custom') ? 'block' : 'none';
-    if (quoteSelect.value === 'custom') {
-      customQuoteInput.focus();
-    }
-  });
-
   function applyThemePreview() {
     const theme = document.querySelector('input[name="themeChoice"]:checked').value;
     document.documentElement.setAttribute('data-theme', theme);
@@ -718,37 +700,6 @@
   }
   function hideError() {
     scoreError.style.display = 'none';
-  }
-
-  // تنتظر رفع الصورة إن كان لا يزال قيد التنفيذ قبل إنشاء البطاقة،
-  // كي لا نفوّت رابط الصورة الدائم من ImgBB.
-  function waitForUploadThenGenerate(name, score, outOf, certType, theme, quote, fromText) {
-    generateBtn.disabled = true;
-    generateBtn.textContent = 'جاري تجهيز الصورة ...';
-
-    let waited = 0;
-    const interval = setInterval(function() {
-      waited += 200;
-      const uploadInProgress = uploadStatus.classList.contains('show') &&
-        !uploadStatus.classList.contains('success') &&
-        !uploadStatus.classList.contains('error');
-
-      if (!uploadInProgress || waited >= 8000) {
-        clearInterval(interval);
-        generateBtn.disabled = false;
-        generateBtn.textContent = 'أنشئي البطاقة ✨';
-        finalizeCard(name, score, outOf, certType, theme, quote, fromText);
-      }
-    }, 200);
-  }
-
-  function finalizeCard(name, score, outOf, certType, theme, quote, fromText) {
-    const finalPhoto = uploadedPhotoUrl || photoDataUrl || null;
-    buildCard(name, score, outOf, certType, theme, quote, fromText, finalPhoto);
-    formView.style.display = 'none';
-    cardView.style.display = 'flex';
-    launchConfetti();
-    scrollToCard();
   }
 
   generateBtn.addEventListener('click', function() {
@@ -787,16 +738,12 @@
       quote = quotes[Number(quoteSelect.value)];
     }
 
-    const hasPhotoSelected = !!(photoDataUrl);
-    const uploadStillRunning = uploadStatus.classList.contains('show') &&
-      !uploadStatus.classList.contains('success') &&
-      !uploadStatus.classList.contains('error');
-
-    if (hasPhotoSelected && uploadStillRunning) {
-      waitForUploadThenGenerate(name, score, outOf, certType, theme, quote, fromInput.value.trim());
-    } else {
-      finalizeCard(name, score, outOf, certType, theme, quote, fromInput.value.trim());
-    }
+    const finalPhoto = uploadedPhotoUrl || photoDataUrl || null;
+    
+    buildCard(name, score, outOf, certType, theme, quote, fromInput.value.trim(), finalPhoto);
+    formView.style.display = 'none';
+    cardView.style.display = 'flex';
+    launchConfetti();
   });
 
   // ===== الدالة المعدلة لعرض الصورة =====
@@ -819,14 +766,9 @@
     const img = new Image();
     img.alt = name || 'صورة';
     img.className = 'loading';
-    // نحمّل الصورة فوراً بأولوية عالية (مهم على الإنترنت الضعيف) بدل التحميل الكسول
-    img.loading = 'eager';
-    img.decoding = 'async';
-    if ('fetchPriority' in img) {
-      img.fetchPriority = 'high';
-    }
+    img.loading = 'lazy';
 
-    // مؤقت للتحقق من التحميل (15 ثانية، لإعطاء وقت أطول للإنترنت الضعيف)
+    // مؤقت للتحقق من التحميل (10 ثواني)
     let loadTimeout = setTimeout(() => {
       if (!img.complete) {
         spinner.style.display = 'none';
@@ -837,7 +779,7 @@
         photoWrap.style.borderColor = '#e6417a';
         setTimeout(() => photoWrap.style.borderColor = '', 3000);
       }
-    }, 15000);
+    }, 10000);
 
     img.onload = function() {
       clearTimeout(loadTimeout);
@@ -845,7 +787,7 @@
       img.className = 'loaded';
       photoInner.appendChild(img);
       photoWrap.style.borderColor = '';
-      scrollToCard();
+      window.scrollTo(0, 0);
     };
 
     img.onerror = function() {
@@ -901,7 +843,7 @@
     // عرض الصورة
     const photoWrap = document.getElementById('photoFrameWrap');
     const photoInner = document.getElementById('photoFrameInner');
-
+    
     if (photoUrl) {
       displayPhoto(photoInner, photoWrap, photoUrl, name);
     } else {
@@ -917,35 +859,20 @@
 
   // ===== مشاركة الرابط =====
 
-  // مفاتيح مختصرة لرابط أقصر: n=الاسم s=العلامة o=العلامة الكاملة
-  // c=نوع الشهادة (b/t) t=الطابع q=العبارة (رقم إن كانت جاهزة، أو نص إن كانت مخصصة)
-  // f=من p=رابط الصورة ph=صورة base64 احتياطية
-  const certTypeShort = { 'بكالوريا': 'b', 'تاسع': 't' };
-  const certTypeLong = { b: 'بكالوريا', t: 'تاسع' };
-
   function buildShareUrl(state) {
     const params = new URLSearchParams();
-    params.set('n', state.name);
-    params.set('s', state.score);
-    params.set('o', state.outOf);
-    params.set('c', certTypeShort[state.certType] || 'b');
-    params.set('t', state.theme);
-
-    // العبارة: إن كانت إحدى العبارات الجاهزة نرسل رقمها فقط بدل النص الكامل
-    // (النص الكامل بالعربي يطوّل الرابط كتير بعد الترميز)، وإلا نرسل النص كما هو.
-    const quoteIndex = quotes.indexOf(state.quote);
-    params.set('q', quoteIndex !== -1 ? String(quoteIndex) : state.quote);
-
-    if (state.fromText) params.set('f', state.fromText);
-
-    // نُفضّل دوماً رابط ImgBB الدائم إن وُجد (قصير أصلاً).
-    // فقط إن لم يتوفر (فشل الرفع أو ما زال جارياً) نلجأ لتضمين الصورة
-    // كنص base64 داخل الرابط نفسه، بحد أقصى أكبر يطابق حجم الضغط الفعلي
-    // (كانت القيمة القديمة 15000 تُسقط الصورة بصمت في أغلب الحالات).
+    params.set('name', state.name);
+    params.set('score', state.score);
+    params.set('outOf', state.outOf);
+    params.set('certType', state.certType);
+    params.set('theme', state.theme);
+    params.set('quote', state.quote);
+    if (state.fromText) params.set('from', state.fromText);
+    
     if (state.photo && state.photo.startsWith('http')) {
-      params.set('p', state.photo);
-    } else if (state.photo && state.photo.length < 70000) {
-      params.set('ph', state.photo);
+      params.set('photoUrl', state.photo);
+    } else if (state.photo && state.photo.length < 15000) {
+      params.set('photo', state.photo);
     }
 
     const base = location.origin + location.pathname;
@@ -999,31 +926,16 @@
 
   function loadFromUrlIfPresent() {
     const params = new URLSearchParams(location.search);
-    // ندعم المفاتيح المختصرة الجديدة (n, s, o...) وأيضاً الأسماء القديمة
-    // الطويلة (name, score, outOf...) كي تبقى الروابط المُرسلة سابقاً تعمل.
-    if (!params.has('n') && !params.has('name')) return;
+    if (!params.has('name')) return;
 
-    const name = params.get('n') ?? params.get('name') ?? '';
-    const score = Number(params.get('s') ?? params.get('score')) || 0;
-    const outOf = Number(params.get('o') ?? params.get('outOf')) || 2800;
-
-    const rawCertType = params.get('c') ?? params.get('certType') ?? 'b';
-    const certType = certTypeLong[rawCertType] || rawCertType || 'بكالوريا';
-
-    const theme = params.get('t') ?? params.get('theme') ?? 'girl';
-
-    const rawQuote = params.get('q') ?? params.get('quote');
-    let quote;
-    if (rawQuote === null || rawQuote === '') {
-      quote = quotes[0];
-    } else if (/^[0-4]$/.test(rawQuote)) {
-      quote = quotes[Number(rawQuote)];
-    } else {
-      quote = rawQuote;
-    }
-
-    const fromText = params.get('f') ?? params.get('from') ?? '';
-    const photoUrl = params.get('p') ?? params.get('photoUrl') ?? params.get('ph') ?? params.get('photo') ?? null;
+    const name = params.get('name') || '';
+    const score = Number(params.get('score')) || 0;
+    const outOf = Number(params.get('outOf')) || 2800;
+    const certType = params.get('certType') || 'بكالوريا';
+    const theme = params.get('theme') || 'girl';
+    const quote = params.get('quote') || quotes[0];
+    const fromText = params.get('from') || '';
+    const photoUrl = params.get('photoUrl') || params.get('photo') || null;
 
     document.documentElement.setAttribute('data-theme', theme);
     buildCard(name, score, outOf, certType, theme, quote, fromText, photoUrl);
@@ -1032,22 +944,10 @@
     makeOwnLink.style.display = 'block';
     launchConfetti();
 
-    scrollToCard();
-    window.addEventListener('load', scrollToCard);
-    setTimeout(scrollToCard, 400);
-    setTimeout(scrollToCard, 1200);
-  }
-
-  // تُبقي البطاقة (والصورة) في أعلى الشاشة بدل التمرير نحو الأسفل
-  function scrollToCard() {
-    const card = document.getElementById('card');
-    if (card && card.scrollIntoView) {
-      card.scrollIntoView({ block: 'start', inline: 'nearest' });
-      // إزاحة بسيطة للأعلى كي لا تلتصق البطاقة بحافة الشاشة تماماً
-      window.scrollBy(0, -16);
-    } else {
-      window.scrollTo(0, 0);
-    }
+    window.scrollTo(0, 0);
+    window.addEventListener('load', function() { window.scrollTo(0, 0); });
+    setTimeout(function() { window.scrollTo(0, 0); }, 400);
+    setTimeout(function() { window.scrollTo(0, 0); }, 1200);
   }
 
   // ===== Confetti =====
@@ -1172,5 +1072,4 @@
 </script>
 
 </body>
-</html>
-
+  </html>
